@@ -2,50 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Toilet Catcher</title>
     <style>
-        body {
-            margin: 0;
-            background: #0d1b2a;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            font-family: sans-serif;
-            color: #fff;
+        * {
+            box-sizing: border-box;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        h1 {
-            margin: 6px 0;
-            font-size: 24px;
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0d1b2a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            font-family: sans-serif;
         }
 
         #gameCanvas {
+            aspect-ratio: 9 / 16;
+            width: 100vw;
+            max-height: 100vh;
+            max-width: calc(100vh * 9 / 16);
             background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
-            border: 3px solid #38bdf8;
+            border: 2px solid #38bdf8;
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
             cursor: none;
-        }
-
-        p {
-            margin-top: 10px;
-            color: #94a3b8;
-            font-size: 14px;
+            display: block;
         }
     </style>
 </head>
 <body>
 
-    <h1>🚽 Toilet Catcher</h1>
-    <canvas id="gameCanvas" width="400" height="500"></canvas>
-    <p>Move your mouse or slide your finger to catch the items!</p>
+    <canvas id="gameCanvas" width="360" height="640"></canvas>
 
     <audio id="voiceCatch" src="catch.mp3" preload="auto"></audio>
     <audio id="voiceMiss" src="miss.mp3" preload="auto"></audio>
     <audio id="voiceGameOver" src="gameover.mp3" preload="auto"></audio>
-    <audio id="bgMusic" src="music.mp3" preload="auto" loop=""></audio>
+    <audio id="bgMusic" src="music.mp3" preload="auto" loop></audio>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
@@ -86,32 +87,36 @@
         const candyIcons = ["💩", "💩", "💩", "💩"];
 
         const basket = {
-            width: 70,
-            height: 50,
-            x: canvas.width / 2 - 35,
-            y: canvas.height - 60,
+            width: 72,
+            height: 52,
+            x: canvas.width / 2 - 36,
+            y: canvas.height - 75,
             icon: "🚽"
         };
 
         let candies = [];
         let spawnTimer = 0;
 
-        canvas.addEventListener("mousemove", (e) => {
+        function handlePointer(clientX) {
             startBackgroundMusic();
             const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            basket.x = Math.max(0, Math.min(canvas.width - basket.width, mouseX - basket.width / 2));
+            const scaleX = canvas.width / rect.width;
+            const canvasX = (clientX - rect.left) * scaleX;
+            basket.x = Math.max(0, Math.min(canvas.width - basket.width, canvasX - basket.width / 2));
+        }
+
+        canvas.addEventListener("mousemove", (e) => {
+            handlePointer(e.clientX);
         });
 
         canvas.addEventListener("touchmove", (e) => {
-            startBackgroundMusic();
             e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const touchX = e.touches[0].clientX - rect.left;
-            basket.x = Math.max(0, Math.min(canvas.width - basket.width, touchX - basket.width / 2));
+            if (e.touches.length > 0) {
+                handlePointer(e.touches[0].clientX);
+            }
         }, { passive: false });
 
-        canvas.addEventListener("click", () => {
+        canvas.addEventListener("pointerdown", () => {
             if (gameOver) {
                 score = 0;
                 lives = 3;
@@ -127,11 +132,11 @@
         function spawnCandy() {
             const icon = candyIcons[Math.floor(Math.random() * candyIcons.length)];
             candies.push({
-                x: Math.random() * (canvas.width - 30) + 15,
-                y: -20,
-                speed: 2.5 + Math.random() * 2,
+                x: Math.random() * (canvas.width - 40) + 20,
+                y: -30,
+                speed: 3 + Math.random() * 2.5,
                 icon: icon,
-                size: 28
+                size: 32
             });
         }
 
@@ -140,13 +145,13 @@
 
             if (!gameOver) {
                 spawnTimer++;
-                if (spawnTimer % 45 === 0) {
+                if (spawnTimer % 40 === 0) {
                     spawnCandy();
                 }
 
-                ctx.font = "48px sans-serif";
+                ctx.font = "52px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText(basket.icon, basket.x + basket.width / 2, basket.y + 42);
+                ctx.fillText(basket.icon, basket.x + basket.width / 2, basket.y + 44);
 
                 for (let i = candies.length - 1; i >= 0; i--) {
                     const candy = candies[i];
@@ -156,12 +161,12 @@
                     ctx.textAlign = "center";
                     ctx.fillText(candy.icon, candy.x, candy.y);
 
-                    // Catch candy in the toilet bowl
+                    // Collision detection
                     if (
                         candy.y >= basket.y &&
                         candy.y <= basket.y + basket.height &&
-                        candy.x >= basket.x - 5 &&
-                        candy.x <= basket.x + basket.width + 5
+                        candy.x >= basket.x - 8 &&
+                        candy.x <= basket.x + basket.width + 8
                     ) {
                         score += 10;
                         playAudio(voiceCatch);
@@ -169,8 +174,8 @@
                         continue;
                     }
 
-                    // Miss candy
-                    if (candy.y > canvas.height + 20) {
+                    // Miss detection
+                    if (candy.y > canvas.height + 25) {
                         candies.splice(i, 1);
                         lives--;
                         playAudio(voiceMiss);
@@ -183,29 +188,30 @@
                     }
                 }
 
-                ctx.fillStyle = "#1e293b";
-                ctx.font = "bold 16px sans-serif";
+                // UI Heads Up Display
+                ctx.fillStyle = "#0f172a";
+                ctx.font = "bold 18px sans-serif";
                 ctx.textAlign = "left";
-                ctx.fillText(`Score: ${score}`, 15, 30);
+                ctx.fillText(`Score: ${score}`, 18, 38);
                 ctx.textAlign = "right";
-                ctx.fillText(`Lives: ${"❤️".repeat(lives)}`, canvas.width - 15, 30);
+                ctx.fillText(`${"❤️".repeat(lives)}`, canvas.width - 18, 38);
 
                 requestAnimationFrame(update);
             } else {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+                ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 26px sans-serif";
+                ctx.font = "bold 30px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 30);
 
-                ctx.font = "18px sans-serif";
-                ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
+                ctx.font = "20px sans-serif";
+                ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
 
-                ctx.font = "14px sans-serif";
-                ctx.fillStyle = "#7dd3fc";
-                ctx.fillText("Click anywhere to play again", canvas.width / 2, canvas.height / 2 + 55);
+                ctx.font = "15px sans-serif";
+                ctx.fillStyle = "#38bdf8";
+                ctx.fillText("Tap anywhere to restart", canvas.width / 2, canvas.height / 2 + 65);
             }
         }
 
