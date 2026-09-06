@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Candy Catcher</title>
+  <style>
+    body {
+      margin: 0;
+      background: #1a1a24;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: sans-serif;
+      color: #fff;
+    }
+    h1 { margin: 6px 0; font-size: 24px; }
+    #gameCanvas {
+      background: linear-gradient(180deg, #ffeef2 0%, #ffd6e0 100%);
+      border: 3px solid #ff4d6d;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      cursor: none;
+    }
+    p { margin-top: 10px; color: #bbb; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <h1>🍬 Candy Catcher</h1>
+  <canvas id="gameCanvas" width="400" height="500"></canvas>
+  <p>Move your mouse or slide your finger to catch the candies!</p>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let score = 0;
+    let lives = 3;
+    let gameOver = false;
+    const candyIcons = ["🍬", "🍭", "🍫", "🍩"];
+
+    const basket = {
+      width: 80,
+      height: 40,
+      x: canvas.width / 2 - 40,
+      y: canvas.height - 50,
+      label: "🥫 CAN"
+    };
+
+    let candies = [];
+    let spawnTimer = 0;
+
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      basket.x = Math.max(0, Math.min(canvas.width - basket.width, mouseX - basket.width / 2));
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const touchX = e.touches[0].clientX - rect.left;
+      basket.x = Math.max(0, Math.min(canvas.width - basket.width, touchX - basket.width / 2));
+    }, { passive: false });
+
+    canvas.addEventListener("click", () => {
+      if (gameOver) {
+        score = 0;
+        lives = 3;
+        candies = [];
+        gameOver = false;
+        requestAnimationFrame(update);
+      }
+    });
+
+    function spawnCandy() {
+      const icon = candyIcons[Math.floor(Math.random() * candyIcons.length)];
+      candies.push({
+        x: Math.random() * (canvas.width - 30) + 10,
+        y: -20,
+        speed: 2.5 + Math.random() * 2,
+        icon: icon,
+        size: 28
+      });
+    }
+
+    function update() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!gameOver) {
+        spawnTimer++;
+        if (spawnTimer % 45 === 0) {
+          spawnCandy();
+        }
+
+        ctx.fillStyle = "#ff4d6d";
+        ctx.beginPath();
+        ctx.roundRect(basket.x, basket.y, basket.width, basket.height, 8);
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(basket.label, basket.x + basket.width / 2, basket.y + 25);
+
+        for (let i = candies.length - 1; i >= 0; i--) {
+          const candy = candies[i];
+          candy.y += candy.speed;
+
+          ctx.font = `${candy.size}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.fillText(candy.icon, candy.x, candy.y);
+
+          if (
+            candy.y >= basket.y &&
+            candy.y <= basket.y + basket.height &&
+            candy.x >= basket.x - 10 &&
+            candy.x <= basket.x + basket.width + 10
+          ) {
+            score += 10;
+            candies.splice(i, 1);
+            continue;
+          }
+
+          if (candy.y > canvas.height + 20) {
+            candies.splice(i, 1);
+            lives--;
+            if (lives <= 0) {
+              gameOver = true;
+            }
+          }
+        }
+
+        ctx.fillStyle = "#333";
+        ctx.font = "bold 16px sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(`Score: ${score}`, 15, 30);
+        ctx.textAlign = "right";
+        ctx.fillText(`Lives: ${"❤️".repeat(lives)}`, canvas.width - 15, 30);
+
+        requestAnimationFrame(update);
+      } else {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 26px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 20);
+
+        ctx.font = "18px sans-serif";
+        ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
+
+        ctx.font = "14px sans-serif";
+        ctx.fillStyle = "#ffb3c1";
+        ctx.fillText("Click anywhere to play again", canvas.width / 2, canvas.height / 2 + 55);
+      }
+    }
+
+    requestAnimationFrame(update);
+  </script>
+</body>
+</html>
