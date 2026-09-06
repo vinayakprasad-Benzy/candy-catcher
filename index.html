@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Toilet Catcher</title>
     <style>
         * {
@@ -10,38 +10,30 @@
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-touch-callout: none;
         }
 
-        body {
+        html, body {
             margin: 0;
             padding: 0;
-            background: #0d1b2a;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            width: 100vw;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            font-family: sans-serif;
+            background: #0d1b2a;
+            position: fixed;
         }
 
         #gameCanvas {
-            aspect-ratio: 9 / 16;
-            width: 100vw;
-            max-height: 100vh;
-            max-width: calc(100vh * 9 / 16);
-            background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
-            border: 2px solid #38bdf8;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-            cursor: none;
             display: block;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(180deg, #e0f2fe 0%, #bae6fd 100%);
         }
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas" width="360" height="640"></canvas>
+    <canvas id="gameCanvas"></canvas>
 
     <audio id="voiceCatch" src="catch.mp3" preload="auto"></audio>
     <audio id="voiceMiss" src="miss.mp3" preload="auto"></audio>
@@ -58,6 +50,52 @@
         const bgMusic = document.getElementById("bgMusic");
 
         let musicStarted = false;
+        let score = 0;
+        let lives = 3;
+        let gameOver = false;
+        let candies = [];
+        let spawnTimer = 0;
+
+        const candyIcons = ["💩", "💩", "💩", "💩"];
+
+        const basket = {
+            width: 80,
+            height: 60,
+            x: 0,
+            y: 0,
+            icon: "🚽"
+        };
+
+        // Get safe-area top padding for Dynamic Island / punch hole
+        function getSafeAreaTop() {
+            const div = document.createElement("div");
+            div.style.paddingTop = "env(safe-area-inset-top, 0px)";
+            document.body.appendChild(div);
+            const topInset = parseInt(window.getComputedStyle(div).paddingTop, 10) || 0;
+            document.body.removeChild(div);
+            return Math.max(topInset, 30); // minimum 30px buffer
+        }
+
+        let safeTop = 40;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            safeTop = getSafeAreaTop();
+
+            // Scale basket proportionally based on screen width
+            basket.width = Math.min(canvas.width * 0.22, 90);
+            basket.height = basket.width * 0.75;
+
+            // Safe bottom margin for gesture bar
+            basket.y = canvas.height - basket.height - 40;
+            basket.x = Math.max(0, Math.min(canvas.width - basket.width, basket.x));
+        }
+
+        window.addEventListener("resize", resizeCanvas);
+        window.addEventListener("orientationchange", resizeCanvas);
+        resizeCanvas();
+        basket.x = canvas.width / 2 - basket.width / 2;
 
         function playAudio(audioElement) {
             if (!audioElement) return;
@@ -81,42 +119,16 @@
             musicStarted = false;
         }
 
-        let score = 0;
-        let lives = 3;
-        let gameOver = false;
-        const candyIcons = ["💩", "💩", "💩", "💩"];
-
-        const basket = {
-            width: 72,
-            height: 52,
-            x: canvas.width / 2 - 36,
-            y: canvas.height - 75,
-            icon: "🚽"
-        };
-
-        let candies = [];
-        let spawnTimer = 0;
-
         function handlePointer(clientX) {
             startBackgroundMusic();
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const canvasX = (clientX - rect.left) * scaleX;
-            basket.x = Math.max(0, Math.min(canvas.width - basket.width, canvasX - basket.width / 2));
+            basket.x = Math.max(0, Math.min(canvas.width - basket.width, clientX - basket.width / 2));
         }
 
-        canvas.addEventListener("mousemove", (e) => {
+        canvas.addEventListener("pointermove", (e) => {
             handlePointer(e.clientX);
         });
 
-        canvas.addEventListener("touchmove", (e) => {
-            e.preventDefault();
-            if (e.touches.length > 0) {
-                handlePointer(e.touches[0].clientX);
-            }
-        }, { passive: false });
-
-        canvas.addEventListener("pointerdown", () => {
+        canvas.addEventListener("pointerdown", (e) => {
             if (gameOver) {
                 score = 0;
                 lives = 3;
@@ -125,18 +137,19 @@
                 startBackgroundMusic();
                 requestAnimationFrame(update);
             } else {
-                startBackgroundMusic();
+                handlePointer(e.clientX);
             }
         });
 
         function spawnCandy() {
             const icon = candyIcons[Math.floor(Math.random() * candyIcons.length)];
+            const size = Math.min(canvas.width * 0.09, 36);
             candies.push({
-                x: Math.random() * (canvas.width - 40) + 20,
-                y: -30,
-                speed: 3 + Math.random() * 2.5,
+                x: Math.random() * (canvas.width - size * 2) + size,
+                y: -size,
+                speed: (canvas.height * 0.005) + Math.random() * 2,
                 icon: icon,
-                size: 32
+                size: size
             });
         }
 
@@ -145,13 +158,14 @@
 
             if (!gameOver) {
                 spawnTimer++;
-                if (spawnTimer % 40 === 0) {
+                if (spawnTimer % 38 === 0) {
                     spawnCandy();
                 }
 
-                ctx.font = "52px sans-serif";
+                // Render Toilet Basket
+                ctx.font = `${basket.width * 0.72}px sans-serif`;
                 ctx.textAlign = "center";
-                ctx.fillText(basket.icon, basket.x + basket.width / 2, basket.y + 44);
+                ctx.fillText(basket.icon, basket.x + basket.width / 2, basket.y + basket.height * 0.85);
 
                 for (let i = candies.length - 1; i >= 0; i--) {
                     const candy = candies[i];
@@ -161,12 +175,12 @@
                     ctx.textAlign = "center";
                     ctx.fillText(candy.icon, candy.x, candy.y);
 
-                    // Collision detection
+                    // Catch detection
                     if (
                         candy.y >= basket.y &&
                         candy.y <= basket.y + basket.height &&
-                        candy.x >= basket.x - 8 &&
-                        candy.x <= basket.x + basket.width + 8
+                        candy.x >= basket.x - 10 &&
+                        candy.x <= basket.x + basket.width + 10
                     ) {
                         score += 10;
                         playAudio(voiceCatch);
@@ -175,7 +189,7 @@
                     }
 
                     // Miss detection
-                    if (candy.y > canvas.height + 25) {
+                    if (candy.y > canvas.height + candy.size) {
                         candies.splice(i, 1);
                         lives--;
                         playAudio(voiceMiss);
@@ -188,13 +202,13 @@
                     }
                 }
 
-                // UI Heads Up Display
+                // HUD positioned below Dynamic Island / front cameras
                 ctx.fillStyle = "#0f172a";
-                ctx.font = "bold 18px sans-serif";
+                ctx.font = "bold 20px sans-serif";
                 ctx.textAlign = "left";
-                ctx.fillText(`Score: ${score}`, 18, 38);
+                ctx.fillText(`Score: ${score}`, 24, safeTop + 20);
                 ctx.textAlign = "right";
-                ctx.fillText(`${"❤️".repeat(lives)}`, canvas.width - 18, 38);
+                ctx.fillText(`${"❤️".repeat(lives)}`, canvas.width - 24, safeTop + 20);
 
                 requestAnimationFrame(update);
             } else {
@@ -202,16 +216,16 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 30px sans-serif";
+                ctx.font = "bold 32px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 30);
+                ctx.fillText("Game Over!", canvas.width / 2, canvas.height / 2 - 40);
 
-                ctx.font = "20px sans-serif";
-                ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 15);
+                ctx.font = "22px sans-serif";
+                ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
 
-                ctx.font = "15px sans-serif";
+                ctx.font = "16px sans-serif";
                 ctx.fillStyle = "#38bdf8";
-                ctx.fillText("Tap anywhere to restart", canvas.width / 2, canvas.height / 2 + 65);
+                ctx.fillText("Tap anywhere to play again", canvas.width / 2, canvas.height / 2 + 60);
             }
         }
 
